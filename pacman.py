@@ -50,6 +50,15 @@ def draw_board():
                 pygame.draw.arc(screen, 'blue', [(j*num2 + 0.5*num2), (i*num1 - 0.5*num1),num2, num1],PI,3*PI/2,5)
             if level[i][j] == 8:
                 pygame.draw.arc(screen, 'blue', [(j*num2 - 0.5*num2), (i*num1 - 0.5*num1),num2, num1],3*PI/2, 2*PI,5)
+def modify_board():
+    if(level[player_y][player_x] == 1 or level[player_y][player_x] == 2):
+        level[player_y][player_x] =0
+def reset_game():
+    player_x = 2
+    player_y = 2
+    level = boards 
+
+
 
 def draw_player():
     
@@ -69,6 +78,7 @@ while run:
     screen.fill('black')
     draw_board()
     draw_player()
+    modify_board()
     
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -76,18 +86,30 @@ while run:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_RIGHT:
                 direction = 0
-                player_x = player_x + 1
-
-                
+                if player_x != 29:
+                    if(level[player_y][player_x+1] not in [3,4,5,6,7,8,9]):
+                        player_x = player_x + 1
+                else:
+                    player_x = 0
             if event.key == pygame.K_LEFT:
                 direction = 1
-                player_x = player_x -1
+                if(level[player_y][player_x-1] not in [3,4,5,6,7,8,9]):
+                    if player_x != 0:
+                        player_x = player_x -1
+                    else:
+                        player_x = 29
             if event.key == pygame.K_UP:
                 direction = 2
-                player_y = player_y - 1
+                if(level[player_y-1][player_x] not in [3,4,5,6,7,8,9]):
+                    player_y = player_y - 1
             if event.key == pygame.K_DOWN:
                 direction = 3
-                player_y = player_y+1
+                if(level[player_y+1][player_x] not in [3,4,5,6,7,8,9]):
+                    player_y = player_y+1
+            if event.key == pygame.K_BACKSLASH:
+                reset_game()
+                draw_board()
+                draw_player()
     
     pygame.display.flip()
 

@@ -14,10 +14,12 @@ pygame.display.set_caption("Pac-Man AI")
 timer = pygame.time.Clock()
 fps = 60
 font = pygame.font.Font("freesansbold.ttf", 20)
-ghost_move_interval = 8
-ghost_move_counter = 0
-num1 = (height - 50) // 32   # tile height
-num2 = width // 30           # tile width
+
+pacman_move_interval = 6
+ghost_move_interval = 6
+
+num1 = (height - 50) // 32   
+num2 = width // 30           
 
 show_paths = True
 
@@ -47,7 +49,6 @@ MODE_ASTAR  = "ASTAR"
 current_mode = MODE_MANUAL
 current_algo = MODE_BFS
 
-#butoane
 button_w, button_h = 160, 35
 button_x = width - button_w - 10
 manual_button = pygame.Rect(button_x, 40,  button_w, button_h)
@@ -65,24 +66,21 @@ for i in range(1, 2 + 1):
         )
     )
 
-PACMAN_START = (2, 2)
+PACMAN_START = (14, 18)
 player_x, player_y = PACMAN_START
-direction = None          # 0=right,1=left,2=up,3=down, None = stopped
+direction = None          
 next_direction = None     
 counter = 0
 score = 0
-lives =3
+lives = 3
 life_image = pygame.transform.scale(
     pygame.image.load("assets/pacman_photos/1.png"),
     (num2, num1)
 )
-pacman_move_interval = 6  
-
 
 power_up = False
-power_up_duration = 8000  #
+power_up_duration = 8000  
 power_up_end_time = 0
-
 
 ghost_size = (num2, num1)
 
@@ -113,9 +111,6 @@ clyde_imgs = {
 }
 
 
-#algoritmi
-
-
 def manhattan(p1, p2) -> int:
     x1, y1 = p1
     x2, y2 = p2
@@ -123,7 +118,6 @@ def manhattan(p1, p2) -> int:
 
 
 def reconstruct_path(came_from, start, end):
-    
     if end not in came_from:
         return [start]
 
@@ -227,9 +221,7 @@ def find_path(algo, start, goal, neighbor_fn):
         return astar_path(start, goal, neighbor_fn)
 
 
-
 def ghost_tile_walkable(x: int, y: int) -> bool:
-    
     if not (0 <= y < len(level) and 0 <= x < len(level[0])):
         return False
     tile = level[y][x]
@@ -239,12 +231,37 @@ def ghost_tile_walkable(x: int, y: int) -> bool:
 def ghost_neighbors(node, ghost):
     x, y = node
     neigh = []
-    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+    directions = {
+        0: (1, 0),
+        1: (-1, 0),
+        2: (0, -1),
+        3: (0, 1)
+    }
+    reverse_map = {0: 1, 1: 0, 2: 3, 3: 2}
+    forbidden = reverse_map.get(ghost.direction, -1)
+    is_start = (x == ghost.x and y == ghost.y)
+
+    for d_code, (dx, dy) in directions.items():
+        if is_start and d_code == forbidden:
+            continue
+
         nx, ny = x + dx, y + dy
         if ghost_tile_walkable(nx, ny):
             neigh.append((nx, ny))
-    return neigh
 
+    if is_start and not neigh:
+        back_dx, back_dy = directions[forbidden]
+        bx, by = x + back_dx, y + back_dy
+        if ghost_tile_walkable(bx, by):
+            neigh.append((bx, by))
+            
+    if is_start and not neigh:
+        for dx, dy in ((1,0), (-1,0), (0,1), (0,-1)):
+             nx, ny = x + dx, y + dy
+             if ghost_tile_walkable(nx, ny):
+                 neigh.append((nx, ny))
+
+    return neigh
 
 def nearest_walkable(target):
     tx, ty = target
@@ -269,10 +286,8 @@ def nearest_walkable(target):
     return start  
 
 
-
 ghost_mode_sequence = [
-   
-    ("scatter", 1000),
+    ("scatter", 2000),
     ("chase", 20000),
     ("scatter", 2000),
     ("chase", 20000),
@@ -301,11 +316,10 @@ def update_ghost_global_mode():
         ghost_mode_start_time = now
 
 
-#corners
-RAW_SCATTER_TL = (2, 2)
-RAW_SCATTER_TR = (27, 2)
-RAW_SCATTER_BR = (27, 29)
-RAW_SCATTER_BL = (2, 29)
+RAW_SCATTER_TL = (1, 1)
+RAW_SCATTER_TR = (28, 1)
+RAW_SCATTER_BR = (28, 30)
+RAW_SCATTER_BL = (1, 30)
 
 scatter_tl = nearest_walkable(RAW_SCATTER_TL)
 scatter_tr = nearest_walkable(RAW_SCATTER_TR)
@@ -315,28 +329,64 @@ scatter_bl = nearest_walkable(RAW_SCATTER_BL)
 GHOST_HOME = (14, 15)
 
 
+def ghost_neighbors(node, ghost):
+    x, y = node
+    neigh = []
+    directions = {
+        0: (1, 0),
+        1: (-1, 0),
+        2: (0, -1),
+        3: (0, 1)
+    }
+    reverse_map = {0: 1, 1: 0, 2: 3, 3: 2}
+    forbidden = reverse_map.get(ghost.direction, -1)
+    is_start = (x == ghost.x and y == ghost.y)
+
+    for d_code, (dx, dy) in directions.items():
+        if is_start and d_code == forbidden:
+            continue
+
+        nx, ny = x + dx, y + dy
+        if ghost_tile_walkable(nx, ny):
+            neigh.append((nx, ny))
+
+    if is_start and not neigh:
+        back_dx, back_dy = directions[forbidden]
+        bx, by = x + back_dx, y + back_dy
+        if ghost_tile_walkable(bx, by):
+            neigh.append((bx, by))
+
+    return neigh
+
+
 class Ghost:
-    def __init__(self, name, start_tile, images, scatter_target):
+    def __init__(self, name, start_tile, images, scatter_cycle):
         self.name = name
         self.start = start_tile
         self.x, self.y = start_tile
         self.images = images
-        self.scatter_target = scatter_target
+        
+
+        self.scatter_cycle = scatter_cycle
+        self.scatter_index = 0  
+        
         self.state = "chase"   
         self.image = self.images["normal"]
-        self.path = []         
+        self.path = []
+        self.direction = 0         
 
     def reset(self):
         self.x, self.y = self.start
         self.state = "chase"
         self.image = self.images["normal"]
         self.path = []
+        self.direction = 0
+        self.scatter_index = 0
 
     def draw(self):
         screen.blit(self.image, (self.x * num2, self.y * num1))
 
     def update_state(self):
-       
         if self.state == "dead":
             self.image = self.images["dead"]
             if (self.x, self.y) == GHOST_HOME:
@@ -356,51 +406,40 @@ class Ghost:
     def get_chase_target(self, pac_pos, pac_dir, blinky_pos):
         px, py = pac_pos
         if self.name == "blinky":
-            # direct chase
             return (px, py)
 
         elif self.name == "pinky":
-            # 4 tiles ahead of Pac-Man
             dx = dy = 0
-            if pac_dir == 0:
-                dx = 4
-            elif pac_dir == 1:
-                dx = -4
-            elif pac_dir == 2:
-                dy = -4
-            elif pac_dir == 3:
-                dy = 4
+            if pac_dir == 0: dx = 4
+            elif pac_dir == 1: dx = -4
+            elif pac_dir == 2: dy = -4
+            elif pac_dir == 3: dy = 4
             return (px + dx, py + dy)
 
         elif self.name == "inky":
-            # depend on Blinky's position and Pac-Man's Location
             bx, by = blinky_pos
-            dx = dy = 0
-            if pac_dir == 0:
-                dx = 2
-            elif pac_dir == 1:
-                dx = -2
-            elif pac_dir == 2:
-                dy = -2
-            elif pac_dir == 3:
-                dy = 2
-            target_x = px + dx
-            target_y = py + dy
-            vector_x = target_x - bx
-            vector_y = target_y - by
+            current_dir = pac_dir if pac_dir is not None else 0
+            
+            pivot_x, pivot_y = px, py
+            if current_dir == 0: pivot_x += 2
+            elif current_dir == 1: pivot_x -= 2
+            elif current_dir == 2: pivot_y -= 2
+            elif current_dir == 3: pivot_y += 2
+
+            vector_x = pivot_x - bx
+            vector_y = pivot_y - by
+            
             return (bx + 2 * vector_x, by + 2 * vector_y)
+
         elif self.name == "clyde":
-            # chase Pac-Man only when <= 8 tiles, else scatter corner
             gx, gy = self.x, self.y
             dist = manhattan((gx, gy), (px, py))
             if dist <= 8:
                 return (px, py)
             else:
-                return self.scatter_target
 
-        
+                return self.scatter_cycle[self.scatter_index]
 
-   
     def frightened_move(self, pac_pos):
         self.path = []  
         start = (self.x, self.y)
@@ -412,26 +451,33 @@ class Ghost:
         if not candidates:
             candidates = ghost_neighbors(start, self)
         if candidates:
-            self.x, self.y = random.choice(candidates)
+            nx, ny = random.choice(candidates)
+            dx, dy = nx - self.x, ny - self.y
+            if dx == 1: self.direction = 0
+            elif dx == -1: self.direction = 1
+            elif dy == -1: self.direction = 2
+            elif dy == 1: self.direction = 3
+            self.x, self.y = nx, ny
 
-   
     def move(self, pac_pos, pac_dir, blinky_pos):
         start = (self.x, self.y)
 
         if self.state == "frightened":
             self.frightened_move(pac_pos)
             return
-
         
         if self.state == "dead":
             target = GHOST_HOME
         elif self.state == "scatter":
-           
-            target = self.scatter_target
+            target = self.scatter_cycle[self.scatter_index]
+            
+            if (self.x, self.y) == target:
+                self.scatter_index = (self.scatter_index + 1) % len(self.scatter_cycle)
+                target = self.scatter_cycle[self.scatter_index]
+
         else:  
             target = self.get_chase_target(pac_pos, pac_dir, blinky_pos)
 
-        
         max_y = len(level) - 1
         max_x = len(level[0]) - 1
         tx = max(0, min(max_x, int(target[0])))
@@ -447,14 +493,46 @@ class Ghost:
         self.path = path 
         if len(path) > 1:
             nx, ny = path[1]
+            dx, dy = nx - self.x, ny - self.y
+            if dx == 1: self.direction = 0
+            elif dx == -1: self.direction = 1
+            elif dy == -1: self.direction = 2
+            elif dy == 1: self.direction = 3
             self.x, self.y = nx, ny
 
 
+scatter_corners_tl = [
+    nearest_walkable((2, 2)), 
+    nearest_walkable((2, 7)), 
+    nearest_walkable((7, 7)), 
+    nearest_walkable((7, 2))
+]
 
-blinky = Ghost("blinky", (13, 16), blinky_imgs, scatter_tr)  
-pinky  = Ghost("pinky",  (13, 15), pinky_imgs,  scatter_tl) 
-inky   = Ghost("inky",   (15, 15), inky_imgs,   scatter_br) 
-clyde  = Ghost("clyde",  (14, 15), clyde_imgs,  scatter_bl)  
+scatter_corners_tr = [
+    nearest_walkable((27, 2)), 
+    nearest_walkable((27, 7)), 
+    nearest_walkable((22, 7)), 
+    nearest_walkable((22, 2))
+]
+
+scatter_corners_br = [
+    nearest_walkable((27, 29)), 
+    nearest_walkable((27, 23)), 
+    nearest_walkable((22, 23)), 
+    nearest_walkable((22, 29))
+]
+
+scatter_corners_bl = [
+    nearest_walkable((2, 29)), 
+    nearest_walkable((2, 23)), 
+    nearest_walkable((7, 23)), 
+    nearest_walkable((7, 29))
+]
+
+blinky = Ghost("blinky", (13, 16), blinky_imgs, scatter_corners_tr)  
+pinky  = Ghost("pinky",  (13, 15), pinky_imgs,  scatter_corners_tl) 
+inky   = Ghost("inky",   (15, 15), inky_imgs,   scatter_corners_br) 
+clyde  = Ghost("clyde",  (14, 15), clyde_imgs,  scatter_corners_bl)
 ghosts = [blinky, pinky, inky, clyde]
 
 
@@ -479,7 +557,6 @@ def draw_board():
                 pygame.draw.arc(screen, 'blue', [(j*num2 + 0.5*num2), (i*num1 - 0.5*num1),num2, num1],PI,3*PI/2,5)
             if level[i][j] == 8:
                 pygame.draw.arc(screen, 'blue', [(j*num2 - 0.5*num2), (i*num1 - 0.5*num1),num2, num1],3*PI/2, 2*PI,5)
-
 
 
 def modify_board():
@@ -582,7 +659,6 @@ def draw_player():
         screen.blit(img, (num2 * player_x, num1 * player_y))
 
 
-
 def draw_paths():
     if not show_paths:
         return
@@ -609,9 +685,7 @@ def draw_paths():
             screen.blit(tile_surf, (tx * num2, ty * num1))
 
 
-
 def can_move(x, y, dir_code):
-   
     max_y = len(level) - 1
 
     if dir_code == 0:   
@@ -632,7 +706,6 @@ def can_move(x, y, dir_code):
 
 
 def update_pacman():
-    
     global player_x, player_y, direction
 
     if next_direction is not None and can_move(player_x, player_y, next_direction):
@@ -652,7 +725,6 @@ def update_pacman():
             player_y += 1
 
 
-
 def reset_positions():
     global player_x, player_y, direction, power_up
     player_x, player_y = PACMAN_START
@@ -667,14 +739,11 @@ def handle_collisions():
 
     for g in ghosts:
         if g.x == player_x and g.y == player_y:
-
-            
             if g.state == "frightened":
                 score += 200
                 g.state = "dead"
                 return
 
-           
             if g.state in ("chase", "scatter"):
                 score = max(0, score - 500)
                 lives -= 1
@@ -700,17 +769,15 @@ while run:
    
     if counter % pacman_move_interval == 0:
         update_pacman()
-        pac_pos = (player_x, player_y)
+    
+    pac_pos = (player_x, player_y)
 
-       
+    for g in ghosts:
+        g.update_state()
+    
+    if counter % ghost_move_interval == 0:
         for g in ghosts:
-            g.update_state()
-       
-        ghost_move_counter += 1
-        if ghost_move_counter >= ghost_move_interval:
-            ghost_move_counter = 0
-            for g in ghosts:
-                g.move(pac_pos, direction if direction is not None else 0,(blinky.x, blinky.y))
+            g.move(pac_pos, direction if direction is not None else 0, (blinky.x, blinky.y))
 
     modify_board()
     update_power_up()
@@ -726,7 +793,6 @@ while run:
     draw_player()
     handle_collisions()
 
-   
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             run = False
